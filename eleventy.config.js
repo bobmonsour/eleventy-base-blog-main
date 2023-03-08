@@ -6,7 +6,9 @@ const pluginSyntaxHighlight = require("@11ty/eleventy-plugin-syntaxhighlight");
 const pluginBundle = require("@11ty/eleventy-plugin-bundle");
 const pluginNavigation = require("@11ty/eleventy-navigation");
 const { EleventyHtmlBasePlugin } = require("@11ty/eleventy");
-const eleventySass = require("@11tyrocks/eleventy-plugin-sass-lightningcss");
+// const eleventySass = require("@11tyrocks/eleventy-plugin-sass-lightningcss");
+const sass = require("sass");
+const path = require("node:path");
 
 module.exports = function (eleventyConfig) {
   // Copy the contents of the `public` folder to the output folder
@@ -24,7 +26,6 @@ module.exports = function (eleventyConfig) {
   // App plugins
   eleventyConfig.addPlugin(require("./eleventy.config.drafts.js"));
   eleventyConfig.addPlugin(require("./eleventy.config.images.js"));
-  eleventyConfig.addPlugin(eleventySass);
 
   // Official plugins
   eleventyConfig.addPlugin(pluginRss);
@@ -92,6 +93,35 @@ module.exports = function (eleventyConfig) {
       level: [1, 2, 3, 4],
       slugify: eleventyConfig.getFilter("slugify"),
     });
+  });
+
+  // Recognize Sass as a "template languages"
+  eleventyConfig.addTemplateFormats("scss");
+
+  // Compile Sass
+  eleventyConfig.addExtension("scss", {
+    outputFileExtension: "css",
+    compile: async function (inputContent, inputPath) {
+      // Skip files like _fileName.scss
+      let parsed = path.parse(inputPath);
+      if (parsed.name.startsWith("_")) {
+        return;
+      }
+
+      // Run file content through Sass
+      let result = sass.compileString(inputContent, {
+        loadPaths: [parsed.dir || "."],
+        sourceMap: false, // or true, your choice!
+      });
+
+      // Allow included files from @use or @import to
+      // trigger rebuilds when using --incremental
+      this.addDependencies(inputPath, result.loadedUrls);
+
+      return async () => {
+        return result.css;
+      };
+    },
   });
 
   // Features to make your build faster (when you need them)
